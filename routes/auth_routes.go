@@ -1,9 +1,9 @@
 package routes
 
 import (
+	"database/sql"
 	"github.com/gin-gonic/gin"
 	"quickZ/handlers"
-	"database/sql"
 )
 
 // AuthRoutes - Define routes related to authentication

@@ -1,10 +1,10 @@
 package routes
 
 import (
+	"database/sql"
 	"github.com/gin-gonic/gin"
 	"quickZ/handlers"
 	"quickZ/middleware"
-	"database/sql"
 )
 
 // UserRoutes - Define all routes accessible by user
