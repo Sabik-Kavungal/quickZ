@@ -2,34 +2,32 @@ package utils
 
 import (
 	"database/sql"
+	
 	"log"
-	"os"
 
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
-// ConnectDB initializes and returns a database connection
+// ConnectDB establishes the connection to the PostgreSQL database
 func ConnectDB() *sql.DB {
-	// Use environment variables to get database credentials
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
+	// Use the provided connection string
+	connStr := "postgresql://root:MBz1sFV9wu6XL6UDAVvRrYZY4UU6bKbq@dpg-csv3asjtq21c73eje9ng-a.singapore-postgres.render.com:5432/quick_ubvt?sslmode=require"
 
-	// Construct the connection string
-	dsn := dbUser + ":" + dbPassword + "@tcp(" + dbHost + ":" + dbPort + ")/" + dbName
+	// Log the connection string (for debugging purposes, remove in production)
+	log.Println("Connecting to DB with connection string: ", connStr)
 
-	// Open the database connection
-	db, err := sql.Open("mysql", dsn)
+	// Open the connection to the PostgreSQL database
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("Error connecting to the database: %v", err)
 	}
 
-	// Test the connection to ensure it's valid
-	if err := db.Ping(); err != nil {
+	// Test the connection
+	err = db.Ping()
+	if err != nil {
 		log.Fatalf("Error pinging the database: %v", err)
 	}
 
+	log.Println("Successfully connected to the PostgreSQL database")
 	return db
 }
