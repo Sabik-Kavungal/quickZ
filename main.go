@@ -5,6 +5,7 @@ import (
 	"log"
 	"quickZ/routes"
 	"quickZ/utils"
+	"os"
 )
 
 func main() {
@@ -24,7 +25,12 @@ func main() {
 	routes.UserRoutes(r, db)  // User routes (List products)
 
 	// Start the server
-	if err := r.Run(":8080"); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // Default port for local development
+	}
+
+	if err := r.Run(":" + port); err != nil {
 		log.Fatal("Error starting the server: ", err)
 	}
 }
