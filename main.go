@@ -3,9 +3,9 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"log"
+	"os"
 	"quickZ/routes"
 	"quickZ/utils"
-	"os"
 )
 
 func main() {
@@ -17,7 +17,8 @@ func main() {
 	r := gin.Default()
 
 	// Set up CORS
-	r.Use(utils.SetupCORS())
+	// Apply the CORS middleware globally
+	r.Use(utils.EnableCORS())
 
 	// Define Routes
 	routes.AuthRoutes(r, db)  // Authentication routes (Register, Login)
@@ -27,11 +28,10 @@ func main() {
 	// Start the server
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // Default port for local development
+		port = "2000" // Default port for local development
 	}
 
 	if err := r.Run(":" + port); err != nil {
 		log.Fatal("Error starting the server: ", err)
 	}
 }
-	

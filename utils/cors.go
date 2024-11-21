@@ -1,17 +1,24 @@
 package utils
 
 import (
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
-// SetupCORS sets up Cross-Origin Resource Sharing (CORS) middleware for the application
-func SetupCORS() gin.HandlerFunc {
-	return cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "https://quickz.onrender.com"}, // Replace with allowed origins
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	})
+// EnableCORS middleware function for Gin
+func EnableCORS() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Allow all origins, methods, and headers
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		// Handle preflight request (OPTIONS request)
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(200) // Respond with 200 OK to OPTIONS requests
+			return
+		}
+
+		// Continue with the request
+		c.Next()
+	}
 }
