@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"quickZ/models"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -59,7 +60,7 @@ func ListProducts(db *sql.DB) gin.HandlerFunc {
 
 		// Check if any products were found
 		if len(products) == 0 {
-			c.JSON(http.StatusOK, gin.H{"message": "No products found"})
+			c.JSON(http.StatusOK, gin.H{"message": "No products found &&"})
 			return
 		}
 
