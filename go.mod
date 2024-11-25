@@ -41,5 +41,6 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
+	github.com/gorilla/mux v1.8.1
 	github.com/rs/cors v1.11.1
 )

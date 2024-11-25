@@ -2,24 +2,25 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"quickZ/models"
-
-	"github.com/gin-gonic/gin"
 )
 
-func AddProduct(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
+// AddProduct handles adding a new product to the database
+func AddProduct(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		var product models.Product
-		if err := c.ShouldBindJSON(&product); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		// Parse the incoming JSON body
+		if err := json.NewDecoder(r.Body).Decode(&product); err != nil {
+			http.Error(w, "Invalid input", http.StatusBadRequest)
 			return
 		}
 
-		// Extract user ID from the context
-		createdBy, exists := c.Get("userID")
-		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		// Extract user ID from context (assuming context has userID set)
+		createdBy := r.Context().Value("userID")
+		if createdBy == nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
@@ -28,21 +29,27 @@ func AddProduct(db *sql.DB) gin.HandlerFunc {
 		var productID int
 		err := db.QueryRow(query, product.Name, product.Description, product.Price, createdBy).Scan(&productID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not add product"})
+			http.Error(w, "Could not add product", http.StatusInternalServerError)
 			return
 		}
 
 		// Return the ID of the newly created product
-		c.JSON(http.StatusOK, gin.H{"message": "Product added successfully", "productID": productID})
+		response := map[string]interface{}{
+			"message":   "Product added successfully",
+			"productID": productID,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
 	}
 }
 
-func ListProducts(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
+// ListProducts handles listing all products from the database
+func ListProducts(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		// Query to fetch products
 		rows, err := db.Query("SELECT id, name, description, price, created_by FROM products")
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch products"})
+			http.Error(w, "Could not fetch products", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -52,7 +59,7 @@ func ListProducts(db *sql.DB) gin.HandlerFunc {
 			var product models.Product
 			// Scan the product fields
 			if err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.Price, &product.CreatedBy); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not parse product"})
+				http.Error(w, "Could not parse product", http.StatusInternalServerError)
 				return
 			}
 			products = append(products, product)
@@ -60,11 +67,12 @@ func ListProducts(db *sql.DB) gin.HandlerFunc {
 
 		// Check if any products were found
 		if len(products) == 0 {
-			c.JSON(http.StatusOK, gin.H{"message": "No products found &&"})
+			http.Error(w, "No products found", http.StatusOK)
 			return
 		}
-
+		
 		// Return the list of products
-		c.JSON(http.StatusOK, products)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(products)
 	}
 }

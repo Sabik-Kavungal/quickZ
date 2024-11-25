@@ -2,29 +2,30 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
 	"quickZ/models"
 	"quickZ/utils"
 
-	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq" // PostgreSQL driver
 	"golang.org/x/crypto/bcrypt"
 )
 
 // Register handler for user registration
-func Register(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
+func Register(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		var user models.User
-		if err := c.ShouldBindJSON(&user); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		// Decode the incoming JSON payload into the 'user' struct
+		err := json.NewDecoder(r.Body).Decode(&user)
+		if err != nil {
+			http.Error(w, "Invalid input", http.StatusBadRequest)
 			return
 		}
 
 		// Hash the password using bcrypt
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error hashing password"})
+			http.Error(w, "Error hashing password", http.StatusInternalServerError)
 			return
 		}
 
@@ -33,36 +34,39 @@ func Register(db *sql.DB) gin.HandlerFunc {
 		if err != nil {
 			// Log the actual error message for debugging
 			log.Printf("Error saving user: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error saving user"})
+			http.Error(w, "Error saving user", http.StatusInternalServerError)
 			return
 		}
 
 		// Return success message
-		c.JSON(http.StatusOK, gin.H{"message": "User registered successfully"})
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
 	}
 }
 
 // Login handler for user login
-func Login(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
+func Login(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		var loginData models.User
-		if err := c.ShouldBindJSON(&loginData); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		// Decode the incoming JSON payload into the 'loginData' struct
+		err := json.NewDecoder(r.Body).Decode(&loginData)
+		if err != nil {
+			http.Error(w, "Invalid input", http.StatusBadRequest)
 			return
 		}
 
 		var user models.User
 		// Query the database for the user by username
-		err := db.QueryRow("SELECT id, password, type FROM users WHERE username = $1", loginData.Username).
+		err = db.QueryRow("SELECT id, password, type FROM users WHERE username = $1", loginData.Username).
 			Scan(&user.ID, &user.Password, &user.Type)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
 		}
 
 		// Compare the password with the stored hashed password
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginData.Password)); err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Incorrect password"})
+			http.Error(w, "Incorrect password", http.StatusUnauthorized)
 			return
 		}
 
@@ -70,6 +74,11 @@ func Login(db *sql.DB) gin.HandlerFunc {
 		token, _ := utils.GenerateToken(user.ID, user.Type)
 
 		// Return the token and user data
-		c.JSON(http.StatusOK, gin.H{"token": token, "data": user})
+		w.WriteHeader(http.StatusOK)
+		response := map[string]interface{}{
+			"token": token,
+			"data":  user,
+		}
+		json.NewEncoder(w).Encode(response)
 	}
 }
