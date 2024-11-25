@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"os"
 	"quickZ/routes"
 	"quickZ/utils"
+
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -17,7 +18,7 @@ func main() {
 	// Initialize Gorilla Mux router
 	r := mux.NewRouter()
 
-	// Set up CORS middleware globally
+	// Apply the CORS middleware globally
 	r.Use(utils.EnableCORS)
 
 	// Define Routes
