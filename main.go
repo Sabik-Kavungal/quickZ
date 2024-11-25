@@ -1,13 +1,11 @@
 package main
 
 import (
+	"github.com/gin-gonic/gin"
 	"log"
-	"net/http"
 	"os"
 	"quickZ/routes"
 	"quickZ/utils"
-
-	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -15,11 +13,12 @@ func main() {
 	db := utils.ConnectDB()
 	defer db.Close()
 
-	// Initialize Gorilla Mux router
-	r := mux.NewRouter()
+	// Initialize Gin router
+	r := gin.Default()
 
+	// Set up CORS
 	// Apply the CORS middleware globally
-	r.Use(utils.EnableCORS)
+	r.Use(utils.EnableCORS())
 
 	// Define Routes
 	routes.AuthRoutes(r, db)  // Authentication routes (Register, Login)
@@ -32,9 +31,7 @@ func main() {
 		port = "2000" // Default port for local development
 	}
 
-	// Start the server with the Gorilla Mux router
-	log.Printf("Server running on port %s...", port)
-	if err := http.ListenAndServe(":"+port, r); err != nil {
+	if err := r.Run(":" + port); err != nil {
 		log.Fatal("Error starting the server: ", err)
 	}
 }
