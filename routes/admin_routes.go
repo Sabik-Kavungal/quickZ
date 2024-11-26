@@ -26,5 +26,17 @@ func AdminRoutes(r *gin.Engine, db *sql.DB) {
 
 		// Delete a product by ID
 		admin.DELETE("/product/:id", handlers.DeleteProduct(db))
+
+		// Get all users
+		admin.GET("/users", handlers.GetAllUsers(db))
+
+		// Add a new user
+		admin.POST("/user", handlers.AddUser(db))
+
+		// Update user by ID
+		admin.PUT("/user/:id", handlers.UpdateUser(db))
+
+		// Delete user by ID
+		admin.DELETE("/user/:id", handlers.DeleteUser(db))
 	}
 }
