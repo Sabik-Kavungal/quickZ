@@ -88,7 +88,7 @@ func Login(db *sql.DB) gin.HandlerFunc {
 // Get all users (Admin only)
 func GetAllUsers(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, username, type FROM users")
+		rows, err := db.Query("SELECT id, username,password, type FROM users")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching users"})
 			return
