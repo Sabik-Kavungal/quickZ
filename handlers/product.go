@@ -45,21 +45,87 @@ func AddProduct(db *sql.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"message": "Product added successfully", "productID": productID})
 	}
 }
-func ListProducts(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		query := `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
-		          c.name AS category_name
-		          FROM products p
-		          LEFT JOIN categories c ON p.category_id = c.id`
+// func ListProducts(db *sql.DB) gin.HandlerFunc {
+// 	return func(c *gin.Context) {
+// 		query := `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
+// 		          c.name AS category_name
+// 		          FROM products p
+// 		          LEFT JOIN categories c ON p.category_id = c.id`
 
-		rows, err := db.Query(query)
+// 		rows, err := db.Query(query)
+// 		if err != nil {
+// 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch products"})
+// 			return
+// 		}
+// 		defer rows.Close()
+
+// 		var products []models.Product
+// 		for rows.Next() {
+// 			var product models.Product
+// 			var categoryName string
+
+// 			// Scan the data into the product and category name
+// 			if err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.Price,
+// 				&product.CreatedBy, &product.CategoryID, &categoryName); err != nil {
+// 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not parse product"})
+// 				return
+// 			}
+
+// 			// Only include category name instead of the full category object
+// 			product.Category = categoryName
+// 			products = append(products, product)
+// 		}
+
+// 		if len(products) == 0 {
+// 			c.JSON(http.StatusOK, gin.H{"message": "No products found"})
+// 			return
+// 		}
+
+// 		// Return all products with category name instead of full category object
+// 		c.JSON(http.StatusOK, products)
+// 	}
+// }
+
+func ListProductsAndByCategory(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Check if a category ID is provided in the query parameters
+		categoryID := c.Query("category_id")
+
+		var query string
+		var rows *sql.Rows
+		var err error
+
+		if categoryID != "" {
+			// If a category ID is provided, filter products by the category ID
+			query = `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
+			         c.name AS category_name
+			         FROM products p
+			         LEFT JOIN categories c ON p.category_id = c.id
+			         WHERE p.category_id = $1`
+			rows, err = db.Query(query, categoryID)
+		} else {
+			// If no category ID is provided, return all products
+			query = `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
+			         c.name AS category_name
+			         FROM products p
+			         LEFT JOIN categories c ON p.category_id = c.id
+			         ORDER BY c.name, p.id`
+			rows, err = db.Query(query)
+		}
+
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch products"})
 			return
 		}
 		defer rows.Close()
 
-		var products []models.Product
+		// Prepare the response
+		type CategoryWiseProducts struct {
+			Category string           `json:"category"`
+			Products []models.Product `json:"products"`
+		}
+
+		var categoryMap = make(map[string][]models.Product)
 		for rows.Next() {
 			var product models.Product
 			var categoryName string
@@ -71,20 +137,29 @@ func ListProducts(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 
-			// Only include category name instead of the full category object
-			product.Category = categoryName
-			products = append(products, product)
+			// Add the product to the appropriate category group
+			categoryMap[categoryName] = append(categoryMap[categoryName], product)
 		}
 
-		if len(products) == 0 {
+		if len(categoryMap) == 0 {
 			c.JSON(http.StatusOK, gin.H{"message": "No products found"})
 			return
 		}
 
-		// Return all products with category name instead of full category object
-		c.JSON(http.StatusOK, products)
+		// Convert the category map to a slice for response
+		var groupedProducts []CategoryWiseProducts
+		for category, products := range categoryMap {
+			groupedProducts = append(groupedProducts, CategoryWiseProducts{
+				Category: category,
+				Products: products,
+			})
+		}
+
+		// Return the grouped products
+		c.JSON(http.StatusOK, groupedProducts)
 	}
 }
+
 func GetProductByID(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Retrieve the product ID from the URL parameter

@@ -16,7 +16,7 @@ func AdminRoutes(r *gin.Engine, db *sql.DB) {
 		admin.POST("/add", handlers.AddProduct(db))
 
 		// List all products
-		admin.GET("/products", handlers.ListProducts(db))
+		admin.GET("/products", handlers.ListProductsAndByCategory(db))
 
 		// Get a single product by ID
 		admin.GET("/product/:id", handlers.GetProductByID(db))

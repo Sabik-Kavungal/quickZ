@@ -12,6 +12,6 @@ func UserRoutes(r *gin.Engine, db *sql.DB) {
 	user := r.Group("/user")
 	user.Use(middleware.AuthMiddleware("user"))
 	{
-		user.GET("/list", handlers.ListProducts(db))
+		user.GET("/list", handlers.ListProductsAndByCategory(db))
 	}
 }
