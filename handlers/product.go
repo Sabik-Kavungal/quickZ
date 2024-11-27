@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"database/sql"
+
+
 	"net/http"
 	"quickZ/models"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,15 +20,23 @@ func AddProduct(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Validate category_id (now just checking the integer)
+		if product.CategoryID == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Category ID is required"})
+			return
+		}
+
 		createdBy, exists := c.Get("userID")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 
-		query := `INSERT INTO products (name, description, price, created_by) VALUES ($1, $2, $3, $4) RETURNING id`
+		// Insert product into the database
+		query := `INSERT INTO products (name, description, price, created_by, category_id) 
+		          VALUES ($1, $2, $3, $4, $5) RETURNING id`
 		var productID int
-		err := db.QueryRow(query, product.Name, product.Description, product.Price, createdBy).Scan(&productID)
+		err := db.QueryRow(query, product.Name, product.Description, product.Price, createdBy, product.CategoryID).Scan(&productID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not add product"})
 			return
@@ -34,11 +45,14 @@ func AddProduct(db *sql.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"message": "Product added successfully", "productID": productID})
 	}
 }
-
-// ListProducts retrieves all products from the database
 func ListProducts(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, name, description, price, created_by FROM products")
+		query := `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
+		          c.name AS category_name
+		          FROM products p
+		          LEFT JOIN categories c ON p.category_id = c.id`
+
+		rows, err := db.Query(query)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch products"})
 			return
@@ -48,10 +62,17 @@ func ListProducts(db *sql.DB) gin.HandlerFunc {
 		var products []models.Product
 		for rows.Next() {
 			var product models.Product
-			if err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.Price, &product.CreatedBy); err != nil {
+			var categoryName string
+
+			// Scan the data into the product and category name
+			if err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.Price,
+				&product.CreatedBy, &product.CategoryID, &categoryName); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not parse product"})
 				return
 			}
+
+			// Only include category name instead of the full category object
+			product.Category = categoryName
 			products = append(products, product)
 		}
 
@@ -60,25 +81,47 @@ func ListProducts(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Return all products with category name instead of full category object
 		c.JSON(http.StatusOK, products)
 	}
 }
-
-// GetProductByID retrieves a single product by its ID
 func GetProductByID(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Retrieve the product ID from the URL parameter
 		productID := c.Param("id")
+
+		// SQL query to retrieve the product by its ID
+		query := `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
+		          c.name AS category_name
+		          FROM products p
+		          LEFT JOIN categories c ON p.category_id = c.id
+		          WHERE p.id = $1`
+
+		// Query the database for the product by ID
+		row := db.QueryRow(query, productID)
+
+		// Initialize the Product struct to hold the result
 		var product models.Product
-		query := "SELECT id, name, description, price, created_by FROM products WHERE id = $1"
-		err := db.QueryRow(query, productID).Scan(&product.ID, &product.Name, &product.Description, &product.Price, &product.CreatedBy)
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
-			return
-		} else if err != nil {
+		var categoryName string
+
+		// Scan the result into the Product struct and category name
+		err := row.Scan(&product.ID, &product.Name, &product.Description, &product.Price,
+			&product.CreatedBy, &product.CategoryID, &categoryName)
+		if err != nil {
+			// If the product isn't found, return an error
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+				return
+			}
+			// If there's another error (e.g., a database issue), return a 500
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch product"})
 			return
 		}
 
+		// Set the category name in the product
+		product.Category = categoryName
+
+		// Return the product with category name
 		c.JSON(http.StatusOK, product)
 	}
 }
@@ -86,26 +129,49 @@ func GetProductByID(db *sql.DB) gin.HandlerFunc {
 // UpdateProduct updates the details of an existing product
 func UpdateProduct(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Retrieve productID from the URL parameter
 		productID := c.Param("id")
+
+		// Initialize the Product struct to bind JSON data
 		var product models.Product
 		if err := c.ShouldBindJSON(&product); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 			return
 		}
 
-		query := `UPDATE products SET name = $1, description = $2, price = $3 WHERE id = $4`
-		result, err := db.Exec(query, product.Name, product.Description, product.Price, productID)
+		// Convert the productID to an integer
+		id, err := strconv.Atoi(productID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+			return
+		}
+
+		// SQL query to update the product
+		query := `UPDATE products 
+		          SET name = $1, description = $2, price = $3, category_id = $4 
+		          WHERE id = $5`
+
+		// Execute the update query
+		result, err := db.Exec(query, product.Name, product.Description, product.Price, product.CategoryID, id)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update product"})
 			return
 		}
 
-		rowsAffected, _ := result.RowsAffected()
+		// Check if any rows were affected by the update
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking affected rows"})
+			return
+		}
+
+		// If no rows were affected, return a not found error
 		if rowsAffected == 0 {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 			return
 		}
 
+		// Return a success message
 		c.JSON(http.StatusOK, gin.H{"message": "Product updated successfully"})
 	}
 }

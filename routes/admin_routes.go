@@ -38,5 +38,22 @@ func AdminRoutes(r *gin.Engine, db *sql.DB) {
 
 		// Delete user by ID
 		admin.DELETE("/user/:id", handlers.DeleteUser(db))
+
+		// Category Routes
+		// Add a new category
+		admin.POST("/category", handlers.CreateCategory(db))
+
+		// List all categories
+		admin.GET("/categories", handlers.ListCategories(db))
+
+		// Get a single category by ID
+		admin.GET("/category/:id", handlers.GetCategoryByID(db))
+
+		// Update an existing category by ID
+		admin.PUT("/category/:id", handlers.UpdateCategory(db))
+
+		// Delete a category by ID
+		admin.DELETE("/category/:id", handlers.DeleteCategory(db))
+
 	}
 }
