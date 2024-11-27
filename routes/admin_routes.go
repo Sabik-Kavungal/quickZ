@@ -55,5 +55,8 @@ func AdminRoutes(r *gin.Engine, db *sql.DB) {
 		// Delete a category by ID
 		admin.DELETE("/category/:id", handlers.DeleteCategory(db))
 
+		//chat with ai, ai chatbot
+		admin.POST("/ai-chatbot", handlers.AiChatbot)
+
 	}
 }
