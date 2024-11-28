@@ -2,16 +2,12 @@ package handlers
 
 import (
 	"database/sql"
-
-
 	"net/http"
 	"quickZ/models"
 	"strconv"
-
 	"github.com/gin-gonic/gin"
 )
 
-// AddProduct adds a new product to the database
 func AddProduct(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var product models.Product
@@ -20,9 +16,9 @@ func AddProduct(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Validate category_id (now just checking the integer)
-		if product.CategoryID == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Category ID is required"})
+		// Validate required fields
+		if product.CategoryID == 0 || product.ImageUrl == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Category ID and Image URL are required"})
 			return
 		}
 
@@ -32,11 +28,11 @@ func AddProduct(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Insert product into the database
-		query := `INSERT INTO products (name, description, price, created_by, category_id) 
-		          VALUES ($1, $2, $3, $4, $5) RETURNING id`
+		// Insert product into the database with imageUrl
+		query := `INSERT INTO products (name, description, price, created_by, category_id, imageUrl) 
+		          VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 		var productID int
-		err := db.QueryRow(query, product.Name, product.Description, product.Price, createdBy, product.CategoryID).Scan(&productID)
+		err := db.QueryRow(query, product.Name, product.Description, product.Price, createdBy, product.CategoryID, product.ImageUrl).Scan(&productID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not add product"})
 			return
@@ -45,46 +41,7 @@ func AddProduct(db *sql.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"message": "Product added successfully", "productID": productID})
 	}
 }
-// func ListProducts(db *sql.DB) gin.HandlerFunc {
-// 	return func(c *gin.Context) {
-// 		query := `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
-// 		          c.name AS category_name
-// 		          FROM products p
-// 		          LEFT JOIN categories c ON p.category_id = c.id`
 
-// 		rows, err := db.Query(query)
-// 		if err != nil {
-// 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch products"})
-// 			return
-// 		}
-// 		defer rows.Close()
-
-// 		var products []models.Product
-// 		for rows.Next() {
-// 			var product models.Product
-// 			var categoryName string
-
-// 			// Scan the data into the product and category name
-// 			if err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.Price,
-// 				&product.CreatedBy, &product.CategoryID, &categoryName); err != nil {
-// 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not parse product"})
-// 				return
-// 			}
-
-// 			// Only include category name instead of the full category object
-// 			product.Category = categoryName
-// 			products = append(products, product)
-// 		}
-
-// 		if len(products) == 0 {
-// 			c.JSON(http.StatusOK, gin.H{"message": "No products found"})
-// 			return
-// 		}
-
-// 		// Return all products with category name instead of full category object
-// 		c.JSON(http.StatusOK, products)
-// 	}
-// }
 
 func ListProductsAndByCategory(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -97,7 +54,7 @@ func ListProductsAndByCategory(db *sql.DB) gin.HandlerFunc {
 
 		if categoryID != "" {
 			// If a category ID is provided, filter products by the category ID
-			query = `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
+			query = `SELECT p.id, p.name, p.description, p.price, p.imageUrl, p.created_by, p.category_id, 
 			         c.name AS category_name
 			         FROM products p
 			         LEFT JOIN categories c ON p.category_id = c.id
@@ -105,7 +62,7 @@ func ListProductsAndByCategory(db *sql.DB) gin.HandlerFunc {
 			rows, err = db.Query(query, categoryID)
 		} else {
 			// If no category ID is provided, return all products
-			query = `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
+			query = `SELECT p.id, p.name, p.description, p.price, p.imageUrl, p.created_by, p.category_id, 
 			         c.name AS category_name
 			         FROM products p
 			         LEFT JOIN categories c ON p.category_id = c.id
@@ -131,7 +88,7 @@ func ListProductsAndByCategory(db *sql.DB) gin.HandlerFunc {
 			var categoryName string
 
 			// Scan the data into the product and category name
-			if err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.Price,
+			if err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.Price, &product.ImageUrl,
 				&product.CreatedBy, &product.CategoryID, &categoryName); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not parse product"})
 				return
@@ -166,7 +123,7 @@ func GetProductByID(db *sql.DB) gin.HandlerFunc {
 		productID := c.Param("id")
 
 		// SQL query to retrieve the product by its ID
-		query := `SELECT p.id, p.name, p.description, p.price, p.created_by, p.category_id, 
+		query := `SELECT p.id, p.name, p.description, p.price, p.imageUrl, p.created_by, p.category_id, 
 		          c.name AS category_name
 		          FROM products p
 		          LEFT JOIN categories c ON p.category_id = c.id
@@ -180,7 +137,7 @@ func GetProductByID(db *sql.DB) gin.HandlerFunc {
 		var categoryName string
 
 		// Scan the result into the Product struct and category name
-		err := row.Scan(&product.ID, &product.Name, &product.Description, &product.Price,
+		err := row.Scan(&product.ID, &product.Name, &product.Description, &product.Price, &product.ImageUrl,
 			&product.CreatedBy, &product.CategoryID, &categoryName)
 		if err != nil {
 			// If the product isn't found, return an error
@@ -221,13 +178,13 @@ func UpdateProduct(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// SQL query to update the product
+		// SQL query to update the product, including imageUrl
 		query := `UPDATE products 
-		          SET name = $1, description = $2, price = $3, category_id = $4 
-		          WHERE id = $5`
+		          SET name = $1, description = $2, price = $3, category_id = $4, imageUrl = $5 
+		          WHERE id = $6`
 
 		// Execute the update query
-		result, err := db.Exec(query, product.Name, product.Description, product.Price, product.CategoryID, id)
+		result, err := db.Exec(query, product.Name, product.Description, product.Price, product.CategoryID, product.ImageUrl, id)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update product"})
 			return
@@ -250,6 +207,7 @@ func UpdateProduct(db *sql.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"message": "Product updated successfully"})
 	}
 }
+
 
 // DeleteProduct removes a product from the database
 func DeleteProduct(db *sql.DB) gin.HandlerFunc {
