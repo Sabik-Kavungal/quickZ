@@ -82,17 +82,24 @@ func ListProductsAndByCategory(db *sql.DB) gin.HandlerFunc {
 		var categoryMap = make(map[string][]models.Product)
 		for rows.Next() {
 			var product models.Product
-			var imageURL sql.NullString // Handle potential NULL values for image_url
+			var categoryID sql.NullInt64  // Handle potential NULL values for category_id
+			var imageURL sql.NullString   // Handle potential NULL values for image_url
 			var categoryName sql.NullString // Handle potential NULL values for category_name
 
 			// Scan the data
 			if err := rows.Scan(&product.ID, &product.Name, &product.Description, &product.Price,
-				&product.CreatedBy, &product.CategoryID, &imageURL, &categoryName); err != nil {
+				&product.CreatedBy, &categoryID, &imageURL, &categoryName); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not parse product", "details": err.Error()})
 				return
 			}
 
-			// Assign values from sql.NullString
+			// Assign values from sql.NullInt64 and sql.NullString
+			if categoryID.Valid {
+				product.CategoryID = int(categoryID.Int64)
+			} else {
+				product.CategoryID = 0 // Default to 0 if NULL
+			}
+
 			if imageURL.Valid {
 				product.ImageURL = imageURL.String
 			} else {
